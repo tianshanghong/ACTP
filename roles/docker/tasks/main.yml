@@ -1,0 +1,63 @@
+---
+# Install Docker & Docker Compose on Debian/Ubuntu Linux
+
+- name: Install prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Add Docker GPG key
+  apt_key:
+    url: "{{ docker_apt_key_url }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "{{ docker_apt_repository }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install Docker & Compose plugin
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+
+# macOS installation using Homebrew (commented out by default)
+#- name: Install Docker Desktop for macOS
+#  homebrew_cask:
+#    name: docker
+#    state: present
+#  when: ansible_os_family == 'Darwin'
+
+- name: Ensure Docker is running
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Create Docker user group
+  group:
+    name: docker
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add the current user to the Docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  when: ansible_os_family == 'Debian' 

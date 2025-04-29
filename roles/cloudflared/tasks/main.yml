@@ -1,0 +1,77 @@
+---
+# Deploy cloudflared
+
+- name: Create cloudflared directory
+  file:
+    path: "{{ cloudflared_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Download cloudflared binary (Linux)
+  get_url:
+    url: "{{ cloudflared_binary_url }}"
+    dest: "/usr/local/bin/cloudflared"
+    mode: '0755'
+  when: ansible_os_family == 'Debian'
+
+# For macOS, uncomment and adapt as needed
+#- name: Install cloudflared (macOS)
+#  homebrew:
+#    name: cloudflare/cloudflare/cloudflared
+#    state: present
+#  when: ansible_os_family == 'Darwin'
+
+- name: Check if credentials file exists
+  stat:
+    path: "{{ credentials_file }}"
+  register: cf_credentials
+
+- name: Create credential directory if needed
+  file:
+    path: "{{ cloudflared_dir }}"
+    state: directory
+    mode: '0755'
+  when: not cf_credentials.stat.exists
+
+- name: Copy tunnel credentials if provided
+  copy:
+    src: "files/{{ tunnel_id }}.json"
+    dest: "{{ credentials_file }}"
+    mode: '0600'
+  when: not cf_credentials.stat.exists
+  ignore_errors: true
+  register: credentials_copy
+
+- name: Warning about missing credentials file
+  debug:
+    msg: |
+      WARNING: Tunnel credentials file wasn't found or couldn't be copied.
+      You need to run 'cloudflared tunnel login' and 'cloudflared tunnel create <name>'
+      manually on this server, then copy the JSON credentials to {{ credentials_file }}.
+  when: not cf_credentials.stat.exists and (credentials_copy is failed or credentials_copy is skipped)
+
+- name: Deploy cloudflared config
+  template:
+    src: config.yml.j2
+    dest: "{{ cloudflared_dir }}/config.yml"
+    mode: '0644'
+
+- name: Create systemd service for cloudflared
+  template:
+    src: cloudflared.service.j2
+    dest: /etc/systemd/system/cloudflared.service
+    mode: '0644'
+  when: cloudflared_systemd_service and ansible_os_family == 'Debian'
+  register: systemd_service
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+  when: systemd_service is changed and ansible_os_family == 'Debian'
+
+- name: Enable and start cloudflared service
+  systemd:
+    name: cloudflared
+    enabled: yes
+    state: started
+  when: cloudflared_systemd_service and ansible_os_family == 'Debian' 

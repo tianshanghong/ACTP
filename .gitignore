@@ -1,0 +1,41 @@
+# Ignore Ansible retry files
+*.retry
+
+# Ignore tunnel credentials
+files/*.json
+!files/*.json.example
+
+# Ignore inventory with real server details
+inventory.ini
+
+# Ignore configuration with real credentials
+group_vars/all.yml
+
+# Ignore vault password file
+.vault_pass
+
+# Ignore local backups and temporary files
+*.bak
+*.tmp
+*~
+
+# Ignore log files
+*.log
+logs/
+
+# Ignore environment files
+.env
+*.env
+
+# Ignore macOS files
+.DS_Store
+
+# Ignore editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore ansible-generated files
+.ansible/
+ansible.cfg.bak 

@@ -1,0 +1,6 @@
+---
+# External DNS default variables
+external_dns_dir: "/opt/external-dns"
+external_dns_image: "registry.opensource.zalan.do/teapot/external-dns:latest"
+external_dns_provider: "cloudflare"
+external_dns_sources: "label" 

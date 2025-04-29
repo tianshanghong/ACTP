@@ -1,0 +1,7 @@
+---
+# cloudflared default variables
+cloudflared_dir: "/opt/cloudflared"
+cloudflared_version: "latest"
+cloudflared_arch: "amd64"
+cloudflared_binary_url: "https://github.com/cloudflare/cloudflared/releases/{{ cloudflared_version }}/download/cloudflared-linux-{{ cloudflared_arch }}"
+cloudflared_systemd_service: true 

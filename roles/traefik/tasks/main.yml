@@ -1,0 +1,70 @@
+---
+# Deploy Traefik with Docker Compose
+
+- name: Check if Traefik dashboard password is provided
+  pause:
+    prompt: "Enter a password for the Traefik dashboard user '{{ traefik_dashboard_username }}'"
+  register: traefik_password_prompt
+  no_log: true
+  when: traefik_dashboard_auth_enabled and traefik_dashboard_password == ""
+
+- name: Set dashboard password from prompt
+  set_fact:
+    traefik_dashboard_password: "{{ traefik_password_prompt.user_input }}"
+  no_log: true
+  when: traefik_dashboard_auth_enabled and traefik_dashboard_password == "" and traefik_password_prompt.user_input is defined
+
+- name: Create Traefik directory
+  file:
+    path: "{{ traefik_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create Traefik network
+  community.docker.docker_network:
+    name: traefik_network
+    driver: bridge
+
+- name: Ensure acme.json exists with correct permissions
+  file:
+    path: "{{ traefik_dir }}/{{ traefik_acme_file }}"
+    state: touch
+    mode: '0600'
+
+- name: Deploy Traefik compose file
+  template:
+    src: traefik-compose.yml.j2
+    dest: "{{ traefik_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Create hello world demo content
+  file:
+    path: "{{ traefik_dir }}/hello"
+    state: directory
+    mode: '0755'
+
+- name: Create hello world index.html
+  copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Hello from Traefik!</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+          h1 { color: #336699; }
+        </style>
+      </head>
+      <body>
+        <h1>Hello World!</h1>
+        <p>Your Traefik reverse proxy is working correctly.</p>
+        <p>Domain: hello.{{ domain }}</p>
+      </body>
+      </html>
+    dest: "{{ traefik_dir }}/hello/index.html"
+    mode: '0644'
+
+- name: Launch Traefik stack
+  community.docker.docker_compose:
+    project_src: "{{ traefik_dir }}"
+    state: present 

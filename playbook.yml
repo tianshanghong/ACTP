@@ -1,0 +1,52 @@
+---
+- name: Deploy Docker + Traefik + Cloudflare Tunnel + ExternalDNS + Portainer
+  hosts: bare_metal
+  become: true
+  
+  pre_tasks:
+    - name: Check for required variables
+      fail:
+        msg: "Please set your domain in group_vars/all.yml"
+      when: domain is not defined or domain == ""
+    
+    - name: Check for Cloudflare API token
+      pause:
+        prompt: "Enter your Cloudflare API token with Zone:DNS:Edit permissions"
+      register: cf_token_prompt
+      no_log: true
+      when: cf_api_token is not defined or cf_api_token == ""
+    
+    - name: Set Cloudflare API token
+      set_fact:
+        cf_api_token: "{{ cf_token_prompt.user_input }}"
+      no_log: true
+      when: (cf_api_token is not defined or cf_api_token == "") and cf_token_prompt.user_input is defined
+    
+    - name: Check for Cloudflare email
+      pause:
+        prompt: "Enter your email address for Let's Encrypt notifications"
+      register: cf_email_prompt
+      when: cf_email is not defined or cf_email == ""
+    
+    - name: Set Cloudflare email
+      set_fact:
+        cf_email: "{{ cf_email_prompt.user_input }}"
+      when: (cf_email is not defined or cf_email == "") and cf_email_prompt.user_input is defined
+    
+    - name: Check for Tunnel ID
+      pause:
+        prompt: "Enter your Cloudflare Tunnel UUID"
+      register: tunnel_id_prompt
+      when: tunnel_id is not defined or tunnel_id == ""
+    
+    - name: Set Tunnel ID
+      set_fact:
+        tunnel_id: "{{ tunnel_id_prompt.user_input }}"
+      when: (tunnel_id is not defined or tunnel_id == "") and tunnel_id_prompt.user_input is defined
+  
+  roles:
+    - docker
+    - traefik
+    - cloudflared
+    - external_dns
+    - portainer 

@@ -1,0 +1,21 @@
+# Cloudflare Tunnel configuration
+tunnel: {{ tunnel_id }}
+credentials-file: {{ credentials_file }}
+
+# Ingress rules
+ingress:
+  # Route all traffic for your domain to local Traefik
+  - hostname: "*.{{ domain }}"
+    service: https://127.0.0.1:443
+    originRequest:
+      noTLSVerify: true  # Skip certificate verification for local Traefik
+  
+  # Catch-all rule (required)
+  - service: http_status:404
+
+# Metrics
+metrics: 127.0.0.1:2000
+
+# Logging
+# logDirectory: {{ cloudflared_dir }}/logs 
+# logFile: {{ cloudflared_dir }}/logs/cloudflared.log 

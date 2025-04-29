@@ -1,0 +1,34 @@
+---
+# Deploy Portainer
+
+- name: Create Portainer directory
+  file:
+    path: "{{ portainer_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create Portainer data volume
+  community.docker.docker_volume:
+    name: portainer_data
+    state: present
+
+- name: Deploy Portainer compose file
+  template:
+    src: portainer-compose.yml.j2
+    dest: "{{ portainer_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Launch Portainer stack
+  community.docker.docker_compose:
+    project_src: "{{ portainer_dir }}"
+    state: present
+
+- name: Wait for Portainer to be available
+  uri:
+    url: "http://localhost:{{ portainer_port }}/api/status"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+  ignore_errors: true 
