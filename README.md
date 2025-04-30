@@ -1,9 +1,8 @@
-# Ansible Docker + Cloudflare Tunnel + Traefik + ExternalDNS + Portainer
+# Ansible Docker + Cloudflare Tunnel + Traefik + Portainer
 
 This Ansible playbook automates the deployment of a Docker-based infrastructure with:
 - **Traefik** for reverse proxy and automatic TLS certificate management
 - **Cloudflare Tunnel** for secure, encrypted connections without exposing ports to the internet
-- **External DNS** for automatic DNS record management
 - **Portainer CE** for web-based Docker management
 
 ## Architecture Overview
@@ -32,6 +31,25 @@ This setup creates a secure, automated infrastructure where:
              Docker Services
 ```
 
+## Repository Structure
+
+This repository has been organized into the following directories:
+
+```
+.
+├── ansible.cfg            # Ansible configuration file
+├── docs/                  # Documentation files
+├── examples/              # Example configuration files
+├── files/                 # Files used by Ansible (tunnel credentials)
+├── group_vars/            # Variables for Ansible groups
+├── playbook.yml           # Main Ansible playbook
+├── requirements.yml       # Ansible Galaxy requirements
+├── roles/                 # Ansible roles
+└── scripts/               # Utility scripts
+```
+
+For detailed information about the repository structure, see [docs/STRUCTURE.md](docs/STRUCTURE.md).
+
 ## Prerequisites
 
 1. A Cloudflare account with your domain
@@ -39,71 +57,45 @@ This setup creates a secure, automated infrastructure where:
 3. Cloudflare Tunnel created and credentials downloaded
 4. Bare metal servers with SSH access
 5. Ansible ≥ 2.10 on your control machine
+6. Compatible bcrypt Python package (see Compatibility Notes section)
 
-## Setup Instructions
+You can check if your system meets the prerequisites by running:
 
-### 1. Clone this repository
 ```bash
-git clone https://github.com/yourusername/ansible-docker-cloudflare
-cd ansible-docker-cloudflare
+./scripts/check-prereqs.sh
 ```
 
-### 2. Configure your inventory
-Create your inventory file from the template:
+## Quick Start
+
+For detailed installation instructions, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
+
 ```bash
-cp inventory.ini.template inventory.ini
-```
+# Clone repository
+git clone https://github.com/tianshanghong/metal
+cd metal
 
-Then edit `inventory.ini` to list your target servers:
-```ini
-[bare_metal]
-server1 ansible_host=192.168.1.10 ansible_user=yourusername
-server2 ansible_host=192.168.1.11 ansible_user=yourusername
-```
+# Check prerequisites
+./scripts/check-prereqs.sh
 
-### 3. Set your configuration
-Create your configuration file from the template:
-```bash
-cp group_vars/all.yml.template group_vars/all.yml
-```
+# Install Ansible requirements
+ansible-galaxy collection install -r requirements.yml
 
-Then edit `group_vars/all.yml` to set your domain and other parameters. You can leave credentials blank and you'll be prompted for them during playbook execution:
+# Configure (copy from examples)
+cp examples/inventory.ini.template inventory.ini
+cp examples/all.yml.template group_vars/all.yml
 
-```yaml
-domain: "yourdomain.com"
-cf_api_token: ""  # Will be prompted for if empty
-cf_email: ""      # Will be prompted for if empty
-tunnel_id: ""     # Will be prompted for if empty
-```
+# Edit configuration files
+nano inventory.ini
+nano group_vars/all.yml
 
-### 4. Prepare Cloudflare Tunnel credentials
-Create the directory for tunnel credentials:
-```bash
-mkdir -p files
-```
-
-After creating a tunnel in Cloudflare, copy the credentials JSON file to:
-```bash
+# Create Cloudflare Tunnel or copy credentials
+./scripts/create-tunnel.sh
+# OR
 cp ~/.cloudflared/<TUNNEL_ID>.json files/
-```
 
-Alternatively, you can use the included helper script to create a tunnel:
-```bash
-./create-tunnel.sh
-```
-
-### 5. Run the playbook
-```bash
+# Run playbook
 ansible-playbook playbook.yml
 ```
-
-You'll be prompted for any missing credentials during playbook execution.
-
-## Post-Installation
-
-1. Access Portainer at `https://portainer.yourdomain.com`
-2. Test the Hello World service at `https://hello.yourdomain.com`
-3. Add new services by using the appropriate Traefik and ExternalDNS labels
 
 ## Adding New Services
 
@@ -113,14 +105,21 @@ To add a new service, use Docker Compose and add these labels:
 services:
   myapp:
     image: myapp:latest
+    networks:
+      - traefik_network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.myapp.rule=Host(`myapp.example.com`)"
       - "traefik.http.routers.myapp.entrypoints=websecure"
       - "traefik.http.routers.myapp.tls.certresolver=le"
       - "traefik.http.services.myapp.loadbalancer.server.port=8080"
-      - "external-dns.alpha.kubernetes.io/hostname=myapp.example.com."
+
+networks:
+  traefik_network:
+    external: true
 ```
+
+The `networks` section is required to connect your service to the existing Traefik network, and the `external: true` property ensures Docker uses the pre-existing network rather than creating a new one.
 
 ## Security Notes
 
@@ -133,18 +132,87 @@ services:
   - API tokens and credentials (`group_vars/all.yml`)
   - Tunnel credentials (`files/*.json`)
 - Interactive prompts are used to collect credentials securely during deployment
-- Secure password handling for Traefik dashboard
+- Secure password handling:
+  - Traefik dashboard uses SHA-512 hashed passwords
+  - Portainer uses bcrypt hashed passwords set at container startup
 
 ## Customization
 
 - Modify the Traefik configuration in `roles/traefik/templates/traefik-compose.yml.j2`
 - Adjust Cloudflare Tunnel settings in `roles/cloudflared/templates/config.yml.j2`
-- Update External DNS configuration in `roles/external_dns/templates/external-dns-compose.yml.j2`
 - Customize Portainer in `roles/portainer/templates/portainer-compose.yml.j2`
+
+## Compatibility Notes
+
+### bcrypt Python Module
+This playbook uses bcrypt for password hashing. Some versions of the bcrypt Python module (including version 4.0.0+) may cause compatibility issues with Ansible's password hashing functionality. If you encounter this error:
+
+```
+AttributeError: module 'bcrypt' has no attribute '__about__'
+```
+
+The included `scripts/bcrypt_patch.py` script can automatically fix this issue:
+
+```bash
+# Fix bcrypt compatibility issues
+python3 scripts/bcrypt_patch.py
+```
+
+#### Script Features
+- **Auto-detection**: Automatically finds your Ansible Python environment
+- **Non-invasive**: Only patches what's necessary
+- **Safe**: Validates if the patch is needed before applying
+- **Flexible**: Command-line options for custom configurations
+
+#### Advanced Options
+```bash
+# Specify a custom Ansible Python path
+python3 scripts/bcrypt_patch.py --path /path/to/ansible/python/site-packages
+
+# Check if patch is needed without applying it
+python3 scripts/bcrypt_patch.py --check
+
+# Force patching even if it seems already applied
+python3 scripts/bcrypt_patch.py --force
+
+# Show help
+python3 scripts/bcrypt_patch.py --help
+```
+
+#### Alternative Solutions
+If you prefer not to use the patch script:
+
+1. **Install a compatible version of bcrypt**:
+   ```bash
+   pip install bcrypt==3.2.0
+   ```
+
+2. **Use a different hashing method**:
+   Modify the playbook to use SHA-512 or other hash types instead of bcrypt where possible.
+
+### Docker Compose Variable Interpolation
+If you see warnings about undefined variables in Docker Compose:
+```
+The "apr1" variable is not set. Defaulting to a blank string.
+```
+
+This is normal when using password hashes with $ symbols. Our templates automatically escape these characters.
+
+## Troubleshooting
+
+### Password Management
+- For Traefik dashboard authentication, passwords are hashed using SHA-512
+- For Portainer, passwords are hashed using bcrypt with proper escaping for Docker Compose
+- Password hashing is done locally on the Ansible controller for security
+
+### Common Issues
+- If bcrypt hashing fails, ensure you have the correct version installed (see Compatibility Notes)
+- For Docker Compose errors, check that your Docker version is compatible (20.10.0+)
+- For DNS issues, verify that your Cloudflare API token has the correct permissions
 
 ## Notes for macOS Deployments
 
 For macOS hosts, you may need to:
 1. Comment out Linux-specific tasks 
 2. Uncomment and adapt macOS-specific tasks in the role files
-3. Install Docker Desktop for Mac manually or via Homebrew 
+3. Install Docker Desktop for Mac manually or via Homebrew

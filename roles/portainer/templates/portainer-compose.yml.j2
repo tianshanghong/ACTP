@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   portainer:
     image: {{ portainer_image }}
@@ -15,16 +13,15 @@ services:
     ports:
       - "{{ portainer_port }}:9000"
       - "8000:8000"
-    {% if portainer_admin_password != "" %}
-    command: --admin-password="{{ portainer_admin_password | password_hash('bcrypt') }}"
-    {% endif %}
+{% if portainer_admin_password != "" %}
+    command: --admin-password '{{ portainer_escaped_hash }}'
+{% endif %}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.rule=Host(`{{ portainer_subdomain }}.{{ domain }}`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.tls.certresolver=le"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
-      - "external-dns.alpha.kubernetes.io/hostname={{ portainer_subdomain }}.{{ domain }}."
 
   # Portainer Agent - uncomment to use across multiple nodes
   # agent:

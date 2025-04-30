@@ -1,0 +1,25 @@
+# Ignore sensitive files from AI indexing
+files/*.json
+!files/*.json.example
+inventory.ini
+group_vars/all.yml
+.vault_pass
+.env
+*.env
+
+# Don't index temporary and log files
+*.log
+*.tmp
+*.bak
+*~
+logs/
+
+# Skip generated content
+.ansible/
+
+# Skip large directories for better performance
+node_modules/
+.git/
+
+# Ignore Ansible artifacts
+*.retry 

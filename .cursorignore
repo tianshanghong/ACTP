@@ -1,0 +1,22 @@
+# Credentials and sensitive files
+files/*.json
+!files/*.json.example
+inventory.ini
+group_vars/all.yml
+.vault_pass
+.env
+*.env
+
+# Temp and log files
+*.log
+*.tmp
+*.bak
+*~
+logs/
+
+# Generated content
+.ansible/
+
+# Large directories you don't need indexed
+node_modules/
+.git/ 

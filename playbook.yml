@@ -1,5 +1,5 @@
 ---
-- name: Deploy Docker + Traefik + Cloudflare Tunnel + ExternalDNS + Portainer
+- name: Deploy Docker + Traefik + Cloudflare Tunnel + Portainer
   hosts: bare_metal
   become: true
   
@@ -48,5 +48,4 @@
     - docker
     - traefik
     - cloudflared
-    - external_dns
     - portainer 
