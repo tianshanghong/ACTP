@@ -98,4 +98,5 @@
 - name: Launch Traefik stack
   community.docker.docker_compose_v2:
     project_src: "{{ traefik_dir }}"
-    state: present 
+    state: present
+    pull: "always" 

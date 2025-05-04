@@ -74,6 +74,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ portainer_dir }}"
     state: present
+    pull: "always"
 
 - name: Wait for Portainer to be available
   uri:
