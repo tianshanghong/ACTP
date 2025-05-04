@@ -1,6 +1,6 @@
 ---
 # Traefik role default variables
-traefik_version: "v2.11"
+traefik_version: "v3.3.6"
 traefik_acme_file: "acme.json"
 traefik_dir: "/opt/traefik"
 traefik_dashboard_enabled: true
