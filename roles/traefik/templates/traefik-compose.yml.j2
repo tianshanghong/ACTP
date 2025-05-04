@@ -13,9 +13,14 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./{{ traefik_acme_file }}:/letsencrypt/{{ traefik_acme_file }}
+      - ./auth:/auth:ro
     command:
       - "--log.level=INFO"
+{% if traefik_dashboard_enabled %}
       - "--api.dashboard=true"
+{% else %}
+      - "--api.dashboard=false"
+{% endif %}
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=traefik_network"
@@ -33,13 +38,13 @@ services:
     labels:
       - "traefik.enable=true"
 {% if traefik_dashboard_enabled %}
-      - "traefik.http.routers.traefik.rule=Host(`{{ traefik_dashboard_subdomain }}.{{ domain }}`)"
+      - "traefik.http.routers.traefik.rule=Host(`{{ traefik_dashboard_subdomain }}.{{ domains[0].domain }}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.tls.certresolver=le"
       - "traefik.http.routers.traefik.service=api@internal"
-{% if traefik_dashboard_auth_enabled and traefik_dashboard_password != "" %}
+{% if traefik_dashboard_auth_enabled %}
       - "traefik.http.routers.traefik.middlewares=traefik-auth"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users={{ traefik_auth_users }}"
+      - "traefik.http.middlewares.traefik-auth.basicauth.usersfile=/auth/users"
 {% endif %}
 {% endif %}
 
@@ -54,7 +59,7 @@ services:
       - ./hello:/usr/share/nginx/html:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hello.rule=Host(`hello.{{ domain }}`)"
+      - "traefik.http.routers.hello.rule=Host(`hello.{{ domains[0].domain }}`)"
       - "traefik.http.routers.hello.entrypoints=websecure"
       - "traefik.http.routers.hello.tls.certresolver=le"
       - "traefik.http.services.hello.loadbalancer.server.port=80"

@@ -88,14 +88,46 @@ cp examples/all.yml.template group_vars/all.yml
 nano inventory.ini
 nano group_vars/all.yml
 
-# Create Cloudflare Tunnel or copy credentials
+# Create Cloudflare Tunnel
 ./scripts/create-tunnel.sh
-# OR
+# OR copy existing tunnel credentials
 cp ~/.cloudflared/<TUNNEL_ID>.json files/
 
-# Run playbook
+# Run playbook to deploy infrastructure and set up DNS
 ansible-playbook playbook.yml
 ```
+
+## Domain Configuration
+
+This playbook supports both single and multiple domains through a simple configuration structure. In your `group_vars/all.yml` file:
+
+```yaml
+# List of all domains to be configured with Cloudflare Tunnel
+# First domain will be used as default for services without explicit domain
+domains:
+  - domain: "example.com"
+    zone_id: "your_zone_id_here"  # Cloudflare Zone ID from dashboard
+  - domain: "anotherdomain.com"
+    zone_id: "another_zone_id_here"
+```
+
+To set up your domains:
+
+1. Add all domains to your Cloudflare account with Cloudflare Tunnel enabled
+
+2. Obtain the Zone ID for each domain from your Cloudflare dashboard:
+   - Log in to Cloudflare
+   - Select your domain
+   - The Zone ID is displayed on the right side of the Overview page
+
+3. Update your `group_vars/all.yml` file with the domains and their Zone IDs
+
+4. Deploy your infrastructure with Ansible:
+   ```bash
+   ansible-playbook playbook.yml
+   ```
+
+The playbook will configure Cloudflare Tunnel for all your domains, create DNS records, and set up the routing rules.
 
 ## Adding New Services
 
@@ -119,7 +151,25 @@ networks:
     external: true
 ```
 
+For services on additional domains, simply change the Host rule:
+
+```yaml
+- "traefik.http.routers.myapp2.rule=Host(`app.anotherdomain.com`)"
+```
+
 The `networks` section is required to connect your service to the existing Traefik network, and the `external: true` property ensures Docker uses the pre-existing network rather than creating a new one.
+
+Remember that each router name (e.g., `myapp`, `myapp2`) must be unique across all your services.
+
+## Tunnel Management
+
+This project separates concerns between tunnel management (scripts) and DNS management (Ansible):
+
+- **create-tunnel.sh**: Creates Cloudflare Tunnels and prepares credentials
+- **delete-tunnel.sh**: Deletes Cloudflare Tunnels and cleans up credentials
+- **Ansible Playbook**: Manages all DNS records and infrastructure deployment
+
+This separation ensures that DNS records stay in sync with your configuration and prevents conflicts between manual and automated management.
 
 ## Security Notes
 

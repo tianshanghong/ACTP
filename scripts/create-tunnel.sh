@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Helper script to create a Cloudflare Tunnel and prepare credentials file
-# Run this script on one of your servers to create the tunnel and prepare the credentials
+# This script ONLY creates the tunnel - DNS records are managed by Ansible
 
 set -e
 
@@ -124,82 +124,11 @@ else
 fi
 
 # Ask for domain
-read -p "Enter your domain (e.g., example.com): " DOMAIN
+read -p "Enter your primary domain (e.g., example.com): " DOMAIN
 
 if [[ -z "$DOMAIN" ]]; then
     echo "Error: Domain cannot be empty."
     exit 1
-fi
-
-# Check for existing DNS records for this domain that might point to other tunnels
-echo "Checking for existing DNS records for *.$DOMAIN..."
-DNS_ROUTES=$(cloudflared tunnel route dns list 2>/dev/null || echo "Failed to list DNS routes")
-EXISTING_DNS=$(echo "$DNS_ROUTES" | grep -i "hostname=\"*.$DOMAIN\"" || echo "")
-
-if [ ! -z "$EXISTING_DNS" ]; then
-    echo "WARNING: Found existing DNS records for *.$DOMAIN:"
-    echo "$EXISTING_DNS"
-    
-    # Check if it points to a different tunnel
-    DNS_TUNNEL_ID=$(echo "$EXISTING_DNS" | grep -o "id=\"[^\"]*\"" | cut -d'"' -f2)
-    
-    if [ ! -z "$DNS_TUNNEL_ID" ] && [ "$DNS_TUNNEL_ID" != "$TUNNEL_ID" ]; then
-        echo ""
-        echo "CONFLICT DETECTED: The domain *.$DOMAIN is already pointing to a different tunnel!"
-        echo "Current DNS points to tunnel: $DNS_TUNNEL_ID"
-        echo "You're trying to use tunnel: $TUNNEL_ID"
-        echo ""
-        echo "Options:"
-        echo "1. Use a different domain"
-        echo "2. Delete the existing DNS record with: cloudflared tunnel route dns delete *.$DOMAIN"
-        echo "3. Use the tunnel with ID $DNS_TUNNEL_ID instead"
-        echo ""
-        read -p "Do you want to override the existing DNS record? (y/N): " OVERRIDE
-        
-        if [[ ! "$OVERRIDE" =~ ^[Yy]$ ]]; then
-            echo "Aborting DNS setup. You can still use the tunnel, but you'll need to manually set up DNS."
-            USE_DNS=false
-        else
-            echo "Will override existing DNS record..."
-            USE_DNS=true
-        fi
-    else
-        echo "The existing DNS record already points to this tunnel or couldn't determine the target tunnel."
-        echo "Will attempt to update it..."
-        USE_DNS=true
-    fi
-else
-    echo "No existing DNS records found for *.$DOMAIN."
-    USE_DNS=true
-fi
-
-# Create DNS CNAME records (idempotent - Cloudflare will update if exists)
-if [ "$USE_DNS" = true ]; then
-    echo "Creating/updating DNS CNAME record for *.$DOMAIN..."
-    DNS_RESULT=$(cloudflared tunnel route dns "$TUNNEL_ID" "*.$DOMAIN" 2>&1)
-    
-    if [[ $? -ne 0 ]]; then
-        echo "Error creating DNS record: $DNS_RESULT"
-        
-        if [[ "$DNS_RESULT" == *"is neither the ID nor the name of any of your tunnels"* ]]; then
-            echo ""
-            echo "The script couldn't find a tunnel with ID $TUNNEL_ID."
-            echo "This sometimes happens immediately after tunnel creation."
-            echo ""
-            echo "Please wait a few seconds and try running the following command manually:"
-            echo "  cloudflared tunnel route dns $TUNNEL_ID *.$DOMAIN"
-            
-            # Try to verify if the tunnel exists
-            echo ""
-            echo "Verifying tunnel existence..."
-            cloudflared tunnel list | grep -i "$TUNNEL_ID" || echo "Tunnel $TUNNEL_ID not found in tunnel list."
-        fi
-        
-        echo ""
-        echo "Despite this error, you can still continue with the setup."
-    else
-        echo "DNS record successfully created/updated."
-    fi
 fi
 
 # Check if credentials file exists locally before copying
@@ -226,26 +155,7 @@ else
     echo "Credentials file already exists at files/${TUNNEL_ID}.json"
 fi
 
-# Verify final DNS setup
-echo ""
-echo "Verifying DNS setup..."
-FINAL_DNS=$(cloudflared tunnel route dns list 2>/dev/null | grep -i "hostname=\"*.$DOMAIN\"" || echo "No DNS record found")
-if [ ! -z "$FINAL_DNS" ]; then
-    echo "Current DNS configuration for *.$DOMAIN:"
-    echo "$FINAL_DNS"
-    
-    FINAL_TUNNEL_ID=$(echo "$FINAL_DNS" | grep -o "id=\"[^\"]*\"" | cut -d'"' -f2)
-    if [ "$FINAL_TUNNEL_ID" = "$TUNNEL_ID" ]; then
-        echo "✅ DNS is correctly configured to point to this tunnel."
-    else
-        echo "⚠️ Warning: DNS is pointing to tunnel $FINAL_TUNNEL_ID instead of $TUNNEL_ID"
-    fi
-else
-    echo "⚠️ Warning: No DNS record found for *.$DOMAIN"
-    echo "You may need to manually set up DNS after some time."
-fi
-
-# Display next steps
+# Display next steps with clear separation of concerns
 echo ""
 echo "=============================================="
 echo "        Tunnel Setup Complete                 "
@@ -253,17 +163,27 @@ echo "=============================================="
 echo ""
 echo "Tunnel Name: $TUNNEL_NAME"
 echo "Tunnel ID:   $TUNNEL_ID"
-echo "Domain:      *.$DOMAIN"
+echo "Domain:      $DOMAIN"
+echo ""
+echo "IMPORTANT: DNS records will be managed by Ansible, not this script."
 echo ""
 echo "Next Steps:"
-echo "1. Update your group_vars/all.yml with the following values:"
-echo "   domain: \"$DOMAIN\""
+echo "1. Get your Cloudflare Zone ID from the Cloudflare dashboard:"
+echo "   - Log in to Cloudflare"
+echo "   - Select your domain"
+echo "   - Zone ID is displayed on the Overview page"
+echo ""
+echo "2. Update your group_vars/all.yml with the following values:"
+echo "   domains:"
+echo "     - domain: \"$DOMAIN\""
+echo "       zone_id: \"YOUR_ZONE_ID_HERE\"  # Replace with actual Zone ID"
 echo "   tunnel_id: \"$TUNNEL_ID\""
 echo ""
-echo "2. Run the Ansible playbook to deploy your infrastructure:"
+echo "3. Run the Ansible playbook to deploy your infrastructure"
+echo "   and create DNS records pointing to your tunnel:"
 echo "   ansible-playbook playbook.yml"
 echo ""
-echo "3. Access your services at:"
+echo "4. After Ansible runs, you can access your services at:"
 echo "   https://hello.$DOMAIN (example test service)"
 echo "   https://portainer.$DOMAIN (container management)"
 echo "   https://traefik.$DOMAIN (reverse proxy dashboard)"

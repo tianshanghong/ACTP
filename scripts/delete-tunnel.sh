@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Helper script to delete a Cloudflare Tunnel and clean up related files
-# Run this script to safely remove a tunnel from your Cloudflare account
+# This script ONLY deletes tunnels - DNS records are managed by Ansible
 
 set -e
 
@@ -29,6 +29,9 @@ fi
 # Display title
 echo "=============================================="
 echo "        Cloudflare Tunnel Deletion Tool       "
+echo "=============================================="
+echo "NOTE: This script only deletes the tunnel itself."
+echo "      DNS records must be managed by Ansible."
 echo "=============================================="
 
 # List all available tunnels
@@ -102,53 +105,22 @@ fi
 # Get the tunnel name for confirmation
 TUNNEL_NAME=$(echo "$TUNNELS_RAW" | jq -r ".[] | select(.id == \"$TUNNEL_ID\") | .name")
 
-# Fetch tunnel details to find associated DNS records
-echo "Fetching tunnel details and associated DNS routes..."
-TUNNEL_ROUTES=$(cloudflared tunnel route ip list "$TUNNEL_ID" 2>/dev/null || echo "No IP routes found")
-DNS_ROUTES=$(cloudflared tunnel route dns list 2>/dev/null || echo "Failed to list DNS routes")
-
 # Confirm deletion
 echo ""
 echo "You are about to delete the following tunnel:"
 echo "ID:   $TUNNEL_ID"
 echo "Name: $TUNNEL_NAME"
 echo ""
-
-# Show DNS records that might be associated with this tunnel
-echo "Possible associated DNS records:"
-echo "$DNS_ROUTES" | grep -i "$TUNNEL_ID" || echo "No DNS records directly mentioning this tunnel ID were found."
+echo "NOTE: This script will NOT modify any DNS records."
+echo "      To update DNS records, you'll need to run Ansible after removing"
+echo "      this tunnel from your configuration."
 echo ""
 
-read -p "Are you sure you want to delete this tunnel and its associated DNS records? (y/N): " CONFIRM
+read -p "Are you sure you want to delete this tunnel? (y/N): " CONFIRM
 
 if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
     echo "Deletion cancelled."
     exit 0
-fi
-
-# Clean up DNS records first
-echo "Looking for DNS records associated with this tunnel..."
-DNS_RECORDS=$(echo "$DNS_ROUTES" | grep -i "$TUNNEL_ID" || echo "")
-
-if [ ! -z "$DNS_RECORDS" ]; then
-    echo "Found DNS records to clean up:"
-    echo "$DNS_RECORDS"
-    
-    # Extract the domain names from DNS records
-    DOMAINS=$(echo "$DNS_RECORDS" | grep -o "hostname=\"[^\"]*\"" | cut -d'"' -f2)
-    
-    if [ ! -z "$DOMAINS" ]; then
-        echo "Cleaning up DNS records..."
-        echo "$DOMAINS" | while read -r domain; do
-            if [ ! -z "$domain" ]; then
-                echo "Deleting DNS record for $domain..."
-                cloudflared tunnel route dns delete "$domain" || echo "Failed to delete DNS record for $domain"
-            fi
-        done
-    fi
-else
-    echo "No DNS records found specifically mentioning this tunnel ID."
-    echo "Note: Cloudflare will automatically clean up DNS records when deleting a tunnel."
 fi
 
 # Delete the tunnel
@@ -182,9 +154,9 @@ fi
 echo ""
 echo "========================================================="
 echo "Tunnel '$TUNNEL_NAME' ($TUNNEL_ID) has been deleted."
-echo "Associated DNS records have been cleaned up where possible."
 echo ""
-echo "If you used this tunnel in your configuration, remember to:"
-echo "1. Update your group_vars/all.yml to use a different tunnel"
-echo "2. Check that all DNS records have been properly removed"
+echo "IMPORTANT NEXT STEPS:"
+echo "1. Remove this tunnel from your group_vars/all.yml"
+echo "2. Run ansible-playbook playbook.yml to clean up DNS records"
+echo "   and deploy with the updated configuration"
 echo "=========================================================" 

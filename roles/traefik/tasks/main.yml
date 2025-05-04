@@ -10,70 +10,46 @@
     - apache2-utils  # Debian/Ubuntu
   ignore_errors: true  # Allow to continue if one package manager fails
   
-- name: Check if Traefik password file exists
-  stat:
-    path: "{{ traefik_dir }}/.traefik_password_set"
-  register: traefik_password_file
+- name: Create Traefik directory
+  file:
+    path: "{{ traefik_dir }}"
+    state: directory
+    mode: '0755'
 
-- name: Load password from file if exists
-  slurp:
-    src: "{{ traefik_dir }}/.traefik_password_set"
-  register: traefik_password_slurp
-  when: traefik_password_file.stat.exists
+- name: Create Traefik auth directory
+  file:
+    path: "{{ traefik_dir }}/auth"
+    state: directory
+    mode: '0755'
 
-- name: Set password from saved file
-  set_fact:
-    traefik_dashboard_password: "{{ traefik_password_slurp['content'] | b64decode | trim }}"
-  when: traefik_password_file.stat.exists and traefik_password_slurp is defined
+- name: Check if Traefik users file exists
+  ansible.builtin.stat:
+    path: "{{ traefik_dir }}/auth/users"
+  register: traefik_users_file
 
-- name: Check if Traefik dashboard password is provided
+- name: Check if Traefik dashboard password is needed
   pause:
     prompt: "Enter a password for the Traefik dashboard user '{{ traefik_dashboard_username }}'"
   register: traefik_password_prompt
   no_log: true
   when: 
     - traefik_dashboard_auth_enabled 
-    - traefik_dashboard_password == ""
-    - not traefik_password_file.stat.exists
+    - not traefik_users_file.stat is defined or not traefik_users_file.stat.exists
 
-- name: Set dashboard password from prompt
-  set_fact:
-    traefik_dashboard_password: "{{ traefik_password_prompt.user_input }}"
-  no_log: true
+- name: Generate Traefik users file with htpasswd
+  shell: "htpasswd -cb {{ traefik_dir }}/auth/users {{ traefik_dashboard_username }} {{ traefik_password_prompt.user_input }}"
   when: 
     - traefik_dashboard_auth_enabled 
-    - traefik_dashboard_password == "" 
     - traefik_password_prompt.user_input is defined
-    - not traefik_password_file.stat.exists
-
-- name: Generate Traefik dashboard password hash with htpasswd
-  shell: "htpasswd -nbB {{ traefik_dashboard_username }} {{ traefik_dashboard_password }} | sed -e s/\\$/\\$\\$/g"
-  register: htpasswd_result
-  when: traefik_dashboard_auth_enabled and traefik_dashboard_password != ""
+    - not traefik_users_file.stat is defined or not traefik_users_file.stat.exists
   no_log: true
-  changed_when: false
+  changed_when: true
 
-- name: Set htpasswd hash
-  set_fact:
-    traefik_auth_users: "{{ htpasswd_result.stdout }}"
-  when: traefik_dashboard_auth_enabled and traefik_dashboard_password != ""
-  no_log: true
-  
-- name: Save password to file
-  copy:
-    content: "{{ traefik_dashboard_password }}"
-    dest: "{{ traefik_dir }}/.traefik_password_set"
-    mode: '0600'
-  when: 
-    - traefik_dashboard_auth_enabled
-    - traefik_dashboard_password != ""
-    - not traefik_password_file.stat.exists
-
-- name: Create Traefik directory
+- name: Ensure users file has correct permissions
   file:
-    path: "{{ traefik_dir }}"
-    state: directory
-    mode: '0755'
+    path: "{{ traefik_dir }}/auth/users"
+    mode: '0600'
+  when: traefik_dashboard_auth_enabled
 
 - name: Create Traefik network
   community.docker.docker_network:
@@ -113,7 +89,7 @@
       <body>
         <h1>Hello World!</h1>
         <p>Your Traefik reverse proxy is working correctly.</p>
-        <p>Domain: hello.{{ domain }}</p>
+        <p>Domain: hello.{{ domains[0].domain }}</p>
       </body>
       </html>
     dest: "{{ traefik_dir }}/hello/index.html"

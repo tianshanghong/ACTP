@@ -6,8 +6,8 @@
   pre_tasks:
     - name: Check for required variables
       fail:
-        msg: "Please set your domain in group_vars/all.yml"
-      when: domain is not defined or domain == ""
+        msg: "Please configure at least one domain in group_vars/all.yml"
+      when: domains is not defined or domains | length == 0 or domains[0].domain is not defined or domains[0].domain == ""
     
     - name: Check for Cloudflare API token
       pause:

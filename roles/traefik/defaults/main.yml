@@ -7,4 +7,4 @@ traefik_dashboard_enabled: true
 traefik_dashboard_subdomain: "traefik"
 traefik_dashboard_auth_enabled: true
 traefik_dashboard_username: "admin"
-traefik_dashboard_password: ""  # Will be prompted for if empty 
+# Password will be prompted for during first run and stored in users file 
