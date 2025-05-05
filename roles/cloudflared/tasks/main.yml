@@ -68,7 +68,27 @@
     status_code: [200, 201, 400]  # 400 might happen if record already exists
   loop: "{{ domains }}"
   when: cf_api_token != "" and item.zone_id is defined and item.zone_id != ""
-  register: dns_result
+  register: dns_result_wildcard
+  ignore_errors: true
+
+- name: Set up root domain CNAME records for all domains
+  uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ item.zone_id }}/dns_records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ cf_api_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      type: "CNAME"
+      name: "{{ item.domain }}"
+      content: "{{ tunnel_id }}.cfargotunnel.com"
+      ttl: 1
+      proxied: true
+    status_code: [200, 201, 400]  # 400 might happen if record already exists
+  loop: "{{ domains }}"
+  when: cf_api_token != "" and item.zone_id is defined and item.zone_id != ""
+  register: dns_result_root
   ignore_errors: true
 
 - name: Deploy cloudflared config
