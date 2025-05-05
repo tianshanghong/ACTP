@@ -76,6 +76,8 @@
     src: config.yml.j2
     dest: "{{ cloudflared_dir }}/config.yml"
     mode: '0644'
+  notify: Restart cloudflared
+  when: ansible_os_family == 'Debian'
 
 - name: Create systemd service for cloudflared
   template:
@@ -84,6 +86,7 @@
     mode: '0644'
   when: cloudflared_systemd_service and ansible_os_family == 'Debian'
   register: systemd_service
+  notify: Restart cloudflared
 
 - name: Reload systemd
   systemd:
@@ -95,4 +98,8 @@
     name: cloudflared
     enabled: yes
     state: started
-  when: cloudflared_systemd_service and ansible_os_family == 'Debian' 
+  when: cloudflared_systemd_service and ansible_os_family == 'Debian'
+
+# Handlers
+- name: Flush handlers
+  meta: flush_handlers 
