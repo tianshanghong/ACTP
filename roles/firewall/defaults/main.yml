@@ -1,0 +1,21 @@
+---
+# Default variables for firewall role
+
+# IPv4 Management network segments to allow, empty list means no management networks
+firewall_management_networks_v4: []
+  # - 10.0.0.0/8
+  # - 192.168.0.0/16
+
+# IPv6 Management network segments to allow, empty list means no management networks
+firewall_management_networks_v6: []
+  # - fe80::/10
+
+# IPv4 ports to allow (SSH port is handled separately)
+firewall_whitelist_ports_v4: []
+  # - 80
+  # - 443
+
+# IPv6 ports to allow (SSH port is handled separately)
+firewall_whitelist_ports_v6: []
+  # - 80
+  # - 443

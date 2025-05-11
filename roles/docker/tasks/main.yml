@@ -42,13 +42,6 @@
 #    state: present
 #  when: ansible_os_family == 'Darwin'
 
-- name: Ensure Docker is running
-  service:
-    name: docker
-    state: started
-    enabled: yes
-  when: ansible_os_family == 'Debian'
-
 - name: Create Docker user group
   group:
     name: docker
@@ -60,4 +53,37 @@
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
-  when: ansible_os_family == 'Debian' 
+  when: ansible_os_family == 'Debian'
+
+- name: Create Docker daemon configuration directory
+  file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+  when: ansible_os_family == 'Debian'
+
+# Disable inter-container communication and userland proxy
+- name: Configure Docker daemon with security enhancements
+  copy:
+    content: |
+      {
+        "icc": false,
+        "userland-proxy": false
+      }
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  register: docker_daemon_config
+  when: ansible_os_family == 'Debian'
+
+- name: Ensure Docker is enabled and started
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Restart Docker if configuration changed
+  service:
+    name: docker
+    state: restarted
+  when: ansible_os_family == 'Debian' and docker_daemon_config.changed 

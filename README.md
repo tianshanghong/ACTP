@@ -4,6 +4,7 @@ This Ansible playbook automates the deployment of a Docker-based infrastructure 
 - **Traefik** for reverse proxy and automatic TLS certificate management
 - **Cloudflare Tunnel** for secure, encrypted connections without exposing ports to the internet
 - **Portainer CE** for web-based Docker management
+- **iptables Firewall** for securing both system and Docker networking
 
 ## Architecture Overview
 
@@ -12,23 +13,33 @@ This setup creates a secure, automated infrastructure where:
 - Services are automatically assigned subdomains with valid TLS certificates
 - No ports need to be exposed to the internet
 - New services can be deployed by simply adding labels to containers
+- System and Docker networking are secured with iptables rules
 
 ```
-             Internet Users
-                   |
-           [DNS: *.example.com]
-                   |
-             Cloudflare CDN/WAF
-                   |
-        ┌──────────┴──────────┐
-        │  Cloudflare Tunnel  │
-        └──────────┬──────────┘
-                   │ 
-               cloudflared
-                   │ 
-                Traefik
-                   │
-             Docker Services
+                Internet Users
+                      |
+                      ↓
+  ┌─────────────────────────────────────┐
+  │  INPUT iptables chain (system)      │
+  └─────────────────────────────────────┘
+                      |
+              [DNS: *.example.com]
+                      |
+                Cloudflare CDN/WAF
+                      |
+           ┌──────────┴──────────┐
+           │  Cloudflare Tunnel  │
+           └──────────┬──────────┘
+                      |
+                  cloudflared
+                      |
+                   Traefik
+                      |
+   ┌─────────────────────────────────────┐
+   │  DOCKER-USER iptables chain         │
+   └─────────────────────────────────────┘
+                      |
+                Docker Services
 ```
 
 ## Repository Structure
@@ -177,6 +188,17 @@ This separation ensures that DNS records stay in sync with your configuration an
 - All traffic is encrypted with TLS
 - Cloudflare provides DDoS protection and WAF capabilities
 - The setup minimizes attack surface by exposing only necessary services
+- Comprehensive iptables firewall protection:
+  - System INPUT chain secures the host system itself:
+    - Allows established connections and loopback traffic
+    - Permits access from management networks
+    - Whitelists specific service ports (SSH, etc.)
+  - DOCKER-USER chain secures container networking:
+    - Blocks all direct external access to containers
+    - Allows only established connections
+  - Zero public exposure of container services
+  - Both IPv4 and IPv6 are properly secured
+  - Rules persist across reboots via iptables-persistent
 - Sensitive files and credentials are excluded from version control:
   - Server information (`inventory.ini`)
   - API tokens and credentials (`group_vars/all.yml`)

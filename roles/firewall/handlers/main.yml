@@ -1,0 +1,14 @@
+---
+# Handlers for firewall role
+
+- name: Promote v4 rules
+  shell: |
+    mv /etc/iptables/rules.v4.tmp /etc/iptables/rules.v4
+    chmod 600 /etc/iptables/rules.v4
+  become: true
+
+- name: Promote v6 rules
+  shell: |
+    mv /etc/iptables/rules.v6.tmp /etc/iptables/rules.v6
+    chmod 600 /etc/iptables/rules.v6
+  become: true

@@ -1,0 +1,118 @@
+---
+# Main tasks for firewall role - nft backend only version with atomic rule loading
+
+# ========== Packages & binary links ==========================================
+- name: Install nft backend (provided by iptables) and persistence tools
+  apt:
+    name:
+      - iptables            # Available in Ubuntu 20.04/22.04/24.04
+      - iptables-persistent # Provides netfilter-persistent service
+    state: present
+  become: true
+
+# ========== Force nft backend usage ==========================================
+# 1. Use update-alternatives to set nft as default backend for iptables and ip6tables
+- name: Select nft backend via update-alternatives (IPv4/IPv6)
+  command: >
+    update-alternatives --set {{ item.name }} {{ item.path }}
+  loop:
+    - { name: iptables,  path: /usr/sbin/iptables-nft }
+    - { name: ip6tables, path: /usr/sbin/ip6tables-nft }
+  become: true
+
+# 2. Create symlinks for symbolic links to nft backend do not exist
+- name: Ensure generic restore links exist (fallback)
+  file:
+    src: "/usr/sbin/{{ item }}-nft-restore"
+    dest: "/usr/sbin/{{ item }}-restore"
+    state: link
+    force: yes
+  loop:
+    - iptables
+    - ip6tables
+  become: true
+
+# ========== Rules directory setup ============================================
+- name: Create rules directory
+  file:
+    path: /etc/iptables
+    state: directory
+    mode: '0755'
+  become: true
+
+# ========== Atomic Rule Loading =============================================
+# 1. Render to /etc/iptables directly with .tmp suffix
+- name: Render IPv4 rules
+  template:
+    src: rules.v4.j2
+    dest: /etc/iptables/rules.v4.tmp
+    mode: '0600'
+  become: true
+
+# 2. Syntax-check IPv4 rules
+- name: Syntax-check IPv4 rules
+  shell: iptables-restore --test < /etc/iptables/rules.v4.tmp
+  become: true
+
+# 3. Load IPv4 rules atomically
+- name: Load IPv4 rules atomically
+  shell: iptables-restore < /etc/iptables/rules.v4.tmp
+  become: true
+  notify: Promote v4 rules
+  register: v4_load
+
+# 1. Render to /etc/iptables directly with .tmp suffix for IPv6
+- name: Render IPv6 rules
+  template:
+    src: rules.v6.j2
+    dest: /etc/iptables/rules.v6.tmp
+    mode: '0600'
+  become: true
+
+# 2. Syntax-check IPv6 rules
+- name: Syntax-check IPv6 rules
+  shell: ip6tables-restore --test < /etc/iptables/rules.v6.tmp
+  become: true
+
+# 3. Load IPv6 rules atomically
+- name: Load IPv6 rules atomically
+  shell: ip6tables-restore < /etc/iptables/rules.v6.tmp
+  become: true
+  notify: Promote v6 rules
+  register: v6_load
+
+# ========== systemd override ================================================
+- name: Create netfilter-persistent override dir
+  file:
+    path: /etc/systemd/system/netfilter-persistent.service.d
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Make netfilter-persistent start before Docker
+  copy:
+    dest: /etc/systemd/system/netfilter-persistent.service.d/override.conf
+    mode: '0644'
+    content: |
+      [Unit]
+      Before=docker.service
+      After=network-pre.target
+      Requires=
+
+      [Service]
+      ExecStartPre=/bin/sleep 2
+  register: override_file
+  become: true
+
+- name: Reload systemd if override changed
+  systemd:
+    daemon_reload: yes
+  when: override_file is changed
+  become: true
+
+- name: Enable + start netfilter-persistent
+  systemd:
+    name: netfilter-persistent
+    enabled: yes
+    state: started
+  become: true

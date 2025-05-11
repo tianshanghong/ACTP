@@ -12,6 +12,12 @@
     name: portainer_data
     state: present
 
+- name: Create Portainer agent network
+  community.docker.docker_network:
+    name: portainer_agent_network
+    driver: bridge
+    internal: true
+
 - name: Check if Portainer password file exists
   stat:
     path: "{{ portainer_dir }}/.portainer_password_set"
@@ -76,12 +82,10 @@
     state: present
     pull: "always"
 
-- name: Wait for Portainer to be available
-  uri:
-    url: "http://localhost:{{ portainer_port }}/api/status"
-    status_code: 200
-  register: result
-  until: result.status == 200
-  retries: 30
-  delay: 10
-  ignore_errors: true 
+- name: Check if Portainer container is running
+  command: docker ps -q -f name=portainer
+  register: portainer_container
+  changed_when: false
+  retries: 5
+  delay: 5
+  until: portainer_container.stdout != "" 
