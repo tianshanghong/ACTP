@@ -1,6 +1,9 @@
 ---
 # Global variables that can be referenced in playbook & roles
 
+# SSH configuration
+ssh_port: 22  # Default SSH port, can be changed if needed
+
 # Domain configuration
 # List of all domains to be configured with Cloudflare Tunnel
 # First domain will be used as default for services without explicit domain

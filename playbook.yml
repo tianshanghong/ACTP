@@ -4,6 +4,20 @@
   become: true
   
   pre_tasks:
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      
+    - name: Upgrade all packages to latest version
+      apt:
+        upgrade: full
+        update_cache: yes
+        autoremove: yes
+        
+    - name: Gather service facts
+      service_facts:
+    
     - name: Check for required variables
       fail:
         msg: "Please configure at least one domain in group_vars/all.yml"
@@ -43,9 +57,15 @@
       set_fact:
         tunnel_id: "{{ tunnel_id_prompt.user_input }}"
       when: (tunnel_id is not defined or tunnel_id == "") and tunnel_id_prompt.user_input is defined
+    
+    - name: Set default SSH port if not defined
+      set_fact:
+        ssh_port: "22"
+      when: ssh_port is not defined
   
   roles:
+    - firewall
     - docker
     - traefik
     - cloudflared
-    - portainer 
+    - portainer

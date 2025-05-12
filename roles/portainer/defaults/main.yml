@@ -4,6 +4,4 @@ portainer_dir: "/opt/portainer"
 portainer_image: "portainer/portainer-ce:latest"
 portainer_agent_image: "portainer/agent:latest"
 portainer_subdomain: "portainer"
-portainer_port: "9000"
-portainer_agent_port: "9001"
-portainer_admin_password: ""  # Leave empty for default behavior 
+portainer_admin_password: ""  # Leave empty for interactive prompt 
