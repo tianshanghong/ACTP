@@ -114,3 +114,7 @@
     enabled: yes
     state: started
   become: true
+
+# Handlers
+- name: Flush handlers
+  meta: flush_handlers

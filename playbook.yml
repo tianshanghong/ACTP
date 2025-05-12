@@ -14,6 +14,9 @@
         upgrade: full
         update_cache: yes
         autoremove: yes
+        
+    - name: Gather service facts
+      service_facts:
     
     - name: Check for required variables
       fail:

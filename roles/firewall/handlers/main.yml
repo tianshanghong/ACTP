@@ -1,9 +1,6 @@
 ---
 # Handlers for firewall role
 
-# Note: We will run these handlers when the docker service is installed and daemon.json is configured.
-# Otherwise, we have nothing to restart.
-
 - name: Promote v4 rules
   shell: |
     mv /etc/iptables/rules.v4.tmp /etc/iptables/rules.v4
@@ -18,8 +15,11 @@
   become: true
   notify: Restart Docker service
 
+# If docker service is installed, we will restart it when the rules are promoted.
+# If it is not installed, the docker role will install it and start it later.
 - name: Restart Docker service
   systemd:
     name: docker
     state: restarted
   become: true
+  when: "'docker.service' in ansible_facts.services"
