@@ -35,7 +35,14 @@
 # 1. EST/REL
 -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
 
-# 2. drop all other traffic
+# 2. containers -> any (outbound access, cross-host, cross-network)
+# note: DOCKER-ISOLATION will be applied after DOCKER-USER for same-network isolation, so that the cross-network traffic will be blocked
+-A DOCKER-USER -i br+ -j RETURN
+
+# 3. loopback -> Docker bridge (for cloudflared via 127.0.0.1)
+-A DOCKER-USER -i lo -o br+ -j RETURN
+
+# 4. drop all other traffic (block inbound)
 -A DOCKER-USER -j DROP
 
 COMMIT
