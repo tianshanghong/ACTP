@@ -1,14 +1,25 @@
 ---
 # Handlers for firewall role
 
+# Note: We will run these handlers when the docker service is installed and daemon.json is configured.
+# Otherwise, we have nothing to restart.
+
 - name: Promote v4 rules
   shell: |
     mv /etc/iptables/rules.v4.tmp /etc/iptables/rules.v4
     chmod 600 /etc/iptables/rules.v4
   become: true
+  notify: Restart Docker service
 
 - name: Promote v6 rules
   shell: |
     mv /etc/iptables/rules.v6.tmp /etc/iptables/rules.v6
     chmod 600 /etc/iptables/rules.v6
+  become: true
+  notify: Restart Docker service
+
+- name: Restart Docker service
+  systemd:
+    name: docker
+    state: restarted
   become: true

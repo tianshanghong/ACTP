@@ -59,7 +59,6 @@
   shell: iptables-restore < /etc/iptables/rules.v4.tmp
   become: true
   notify: Promote v4 rules
-  register: v4_load
 
 # 1. Render to /etc/iptables directly with .tmp suffix for IPv6
 - name: Render IPv6 rules
@@ -79,7 +78,6 @@
   shell: ip6tables-restore < /etc/iptables/rules.v6.tmp
   become: true
   notify: Promote v6 rules
-  register: v6_load
 
 # ========== systemd override ================================================
 - name: Create netfilter-persistent override dir

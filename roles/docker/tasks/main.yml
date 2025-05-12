@@ -86,4 +86,8 @@
   service:
     name: docker
     state: restarted
-  when: ansible_os_family == 'Debian' and docker_daemon_config.changed 
+  when: ansible_os_family == 'Debian' and docker_daemon_config.changed
+
+# Handlers
+- name: Flush handlers
+  meta: flush_handlers
